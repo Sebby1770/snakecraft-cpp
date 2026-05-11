@@ -73,9 +73,14 @@ public:
     [[nodiscard]] int height() const;
     [[nodiscard]] std::size_t snakeLength() const;
     [[nodiscard]] Point snakeHead() const;
+    [[nodiscard]] Point food() const;
+    [[nodiscard]] Point pointAhead() const;
     [[nodiscard]] Direction direction() const;
     [[nodiscard]] Tile selectedBlock() const;
     [[nodiscard]] const Inventory& inventory() const;
+    [[nodiscard]] const std::deque<Point>& snake() const;
+    [[nodiscard]] const std::string& message() const;
+    [[nodiscard]] int ticks() const;
     [[nodiscard]] Tile tileAt(Point point) const;
     [[nodiscard]] bool containsSnake(Point point) const;
 

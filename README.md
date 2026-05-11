@@ -1,17 +1,20 @@
 # Snakecraft C++
 
-Snakecraft C++ starts as a classic terminal Snake game and nudges it toward a tiny "Terraria clone" by adding a destructible world. Mine terrain, collect blocks, place them back into the map, and keep the snake alive while the board changes around you.
+Snakecraft C++ starts as a classic Snake game and nudges it toward a tiny "Terraria clone" by adding a destructible world. Mine terrain, collect blocks, place them back into the map, and keep the snake alive while the board changes around you.
+
+![Snakecraft desktop app preview](docs/snakecraft-preview.png)
 
 ## Features
 
+- SDL2 desktop app with a drawn snake, animated food, tile art, HUD, and overlays.
 - Classic Snake movement, food, growth, scoring, and self-collision.
 - Procedural tile map with dirt, stone, and wood obstacles.
 - Mining: break the block in front of the snake to collect resources.
 - Building: place collected blocks back into the world.
 - Inventory and selected block display in the HUD.
 - Pause, restart, and quit controls.
+- Terminal fallback build for simple environments.
 - Small CTest suite for core game mechanics.
-- No third-party runtime dependencies.
 
 ## Controls
 
@@ -29,6 +32,30 @@ Snakecraft C++ starts as a classic terminal Snake game and nudges it toward a ti
 | `Q` | Quit |
 
 ## Build and Run
+
+### Desktop App
+
+Install SDL2 and SDL2_ttf first:
+
+```sh
+brew install sdl2 sdl2_ttf
+```
+
+Then build and run the windowed app:
+
+```sh
+cmake -S . -B build
+cmake --build build
+open build/Snakecraft.app
+```
+
+You can also run the app binary directly:
+
+```sh
+./build/Snakecraft.app/Contents/MacOS/Snakecraft
+```
+
+### Terminal Version
 
 ```sh
 cmake -S . -B build
@@ -59,6 +86,7 @@ snakecraft-cpp/
     Game.hpp
     Game.cpp
     Terminal.hpp
+    SdlApp.cpp
     main.cpp
   tests/
     test_game.cpp

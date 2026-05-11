@@ -356,6 +356,16 @@ Point Game::snakeHead() const
     return snake_.front();
 }
 
+Point Game::food() const
+{
+    return food_;
+}
+
+Point Game::pointAhead() const
+{
+    return advance(snake_.front(), direction_);
+}
+
 Direction Game::direction() const
 {
     return direction_;
@@ -369,6 +379,21 @@ Tile Game::selectedBlock() const
 const Inventory& Game::inventory() const
 {
     return inventory_;
+}
+
+const std::deque<Point>& Game::snake() const
+{
+    return snake_;
+}
+
+const std::string& Game::message() const
+{
+    return message_;
+}
+
+int Game::ticks() const
+{
+    return ticks_;
 }
 
 Tile Game::tileAt(Point point) const
