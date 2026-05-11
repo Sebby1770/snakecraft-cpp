@@ -1,0 +1,14 @@
+build/
+.cache/
+.DS_Store
+*.o
+*.obj
+*.exe
+*.out
+*.app
+*.dSYM/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
