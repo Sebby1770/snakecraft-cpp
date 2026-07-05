@@ -8,13 +8,17 @@ Snakecraft C++ starts as a classic Snake game and nudges it toward a tiny "Terra
 
 - SDL2 desktop app with a drawn snake, animated food, tile art, HUD, and overlays.
 - Classic Snake movement, food, growth, scoring, and self-collision.
-- Procedural tile map with dirt, stone, and wood obstacles.
+- Biome-aware procedural map with forest, cave, and desert regions.
+- Five block types: dirt, stone, wood, sand, and high-value ore.
 - Mining: break the block in front of the snake to collect resources.
 - Building: place collected blocks back into the world.
 - Inventory and selected block display in the HUD.
+- Persistent top-five high score table.
+- Save and load full runs to `~/.snakecraft/savegame.txt`.
 - Pause, restart, and quit controls.
 - Terminal fallback build for simple environments.
-- Small CTest suite for core game mechanics.
+- CTest suite for core mechanics, biomes, save/load, and scoring.
+- GitHub Actions CI on macOS and Ubuntu.
 
 ## Controls
 
@@ -27,6 +31,8 @@ Snakecraft C++ starts as a classic Snake game and nudges it toward a tiny "Terra
 | `Space` | Mine the block in front of the snake |
 | `E` | Place the selected block in front of the snake |
 | `Tab` | Cycle selected block type |
+| `F5` / `5` | Save game (SDL / terminal) |
+| `F9` / `9` | Load game (SDL / terminal) |
 | `P` | Pause |
 | `R` | Restart |
 | `Q` | Quit |
@@ -92,10 +98,18 @@ snakecraft-cpp/
     test_game.cpp
 ```
 
+## Persistence
+
+High scores and save files are stored locally:
+
+```text
+~/.snakecraft/highscores.txt
+~/.snakecraft/savegame.txt
+```
+
 ## Future Ideas
 
-- Add biomes, ore tiers, and crafted tools.
-- Add a persistent world save file.
+- Add crafted tools and crafting recipes.
 - Add enemies that tunnel through terrain.
 - Add lighting, caves, and day/night events.
-- Add a simple SDL2 or raylib renderer while keeping the core game logic reusable.
+- Add multiplayer spectate mode.

@@ -20,6 +20,10 @@ int tileScore(Tile tile)
         return 3;
     case Tile::Wood:
         return 2;
+    case Tile::Sand:
+        return 1;
+    case Tile::Ore:
+        return 8;
     case Tile::Empty:
         return 0;
     }
@@ -29,7 +33,13 @@ int tileScore(Tile tile)
 
 bool isResource(Tile tile)
 {
-    return tile == Tile::Dirt || tile == Tile::Stone || tile == Tile::Wood;
+    return tile == Tile::Dirt || tile == Tile::Stone || tile == Tile::Wood || tile == Tile::Sand
+        || tile == Tile::Ore;
+}
+
+bool isPlaceable(Tile tile)
+{
+    return tile == Tile::Dirt || tile == Tile::Stone || tile == Tile::Wood || tile == Tile::Sand;
 }
 
 } // namespace
@@ -43,6 +53,10 @@ int Inventory::count(Tile tile) const
         return stone;
     case Tile::Wood:
         return wood;
+    case Tile::Sand:
+        return sand;
+    case Tile::Ore:
+        return ore;
     case Tile::Empty:
         return 0;
     }
@@ -61,6 +75,12 @@ void Inventory::add(Tile tile)
         break;
     case Tile::Wood:
         ++wood;
+        break;
+    case Tile::Sand:
+        ++sand;
+        break;
+    case Tile::Ore:
+        ++ore;
         break;
     case Tile::Empty:
         break;
@@ -88,6 +108,13 @@ bool Inventory::spend(Tile tile)
         }
         --wood;
         return true;
+    case Tile::Sand:
+        if (sand <= 0) {
+            return false;
+        }
+        --sand;
+        return true;
+    case Tile::Ore:
     case Tile::Empty:
         return false;
     }
@@ -99,6 +126,7 @@ Game::Game(int width, int height, unsigned int seed)
     : width_(std::max(width, kMinWidth))
     , height_(std::max(height, kMinHeight))
     , world_(static_cast<std::size_t>(width_ * height_), Tile::Empty)
+    , biomes_(static_cast<std::size_t>(width_ * height_), Biome::Forest)
     , rng_(seed)
     , seed_(seed)
 {
@@ -108,6 +136,7 @@ Game::Game(int width, int height, unsigned int seed)
 void Game::reset()
 {
     world_.assign(static_cast<std::size_t>(width_ * height_), Tile::Empty);
+    biomes_.assign(static_cast<std::size_t>(width_ * height_), Biome::Forest);
     snake_.clear();
     direction_ = Direction::Right;
     pendingDirection_ = Direction::Right;
@@ -132,7 +161,7 @@ void Game::reset()
 
     carveSafeArea(start);
     spawnFood();
-    setMessage("Mine, build, and keep moving.");
+    setMessage("Forest, cave, and desert biomes ahead. Mine ore for big points.");
 }
 
 void Game::handle(Action action)
@@ -149,6 +178,9 @@ void Game::handle(Action action)
     case Action::Pause:
         paused_ = !paused_;
         setMessage(paused_ ? "Paused." : "Back in motion.");
+        return;
+    case Action::SaveGame:
+    case Action::LoadGame:
         return;
     default:
         break;
@@ -191,6 +223,8 @@ void Game::handle(Action action)
     case Action::None:
     case Action::Pause:
     case Action::Restart:
+    case Action::SaveGame:
+    case Action::LoadGame:
     case Action::Quit:
         break;
     }
@@ -252,6 +286,8 @@ std::string Game::render() const
     out << "Inventory  Dirt " << inventory_.dirt
         << "  Stone " << inventory_.stone
         << "  Wood " << inventory_.wood
+        << "  Sand " << inventory_.sand
+        << "  Ore " << inventory_.ore
         << "  Selected " << tileName(selectedBlock_) << '\n';
 
     out << '+';
@@ -292,7 +328,7 @@ std::string Game::render() const
     }
     out << "+\n";
 
-    out << "WASD/arrows move  Space mine  E build  Tab block  P pause  R restart  Q quit\n";
+    out << "WASD/arrows move  Space mine  E build  Tab block  5 save  9 load  P pause  R restart  Q quit\n";
 
     if (gameOver_) {
         out << "GAME OVER: ";
@@ -371,6 +407,11 @@ Direction Game::direction() const
     return direction_;
 }
 
+Direction Game::pendingDirection() const
+{
+    return pendingDirection_;
+}
+
 Tile Game::selectedBlock() const
 {
     return selectedBlock_;
@@ -396,6 +437,11 @@ int Game::ticks() const
     return ticks_;
 }
 
+unsigned int Game::seed() const
+{
+    return seed_;
+}
+
 Tile Game::tileAt(Point point) const
 {
     if (!inside(point)) {
@@ -403,6 +449,15 @@ Tile Game::tileAt(Point point) const
     }
 
     return world_[static_cast<std::size_t>(index(point))];
+}
+
+Biome Game::biomeAt(Point point) const
+{
+    if (!inside(point)) {
+        return Biome::Forest;
+    }
+
+    return biomes_[static_cast<std::size_t>(index(point))];
 }
 
 bool Game::containsSnake(Point point) const
@@ -453,6 +508,11 @@ bool Game::buildAhead()
         return false;
     }
 
+    if (!isPlaceable(selectedBlock_)) {
+        setMessage("Ore is collectible only. Cycle to dirt, stone, wood, or sand.");
+        return false;
+    }
+
     if (!inventory_.spend(selectedBlock_)) {
         setMessage("No " + tileName(selectedBlock_) + " blocks in inventory.");
         return false;
@@ -482,6 +542,44 @@ void Game::setFood(Point point)
 
     food_ = point;
     setTile(point, Tile::Empty);
+}
+
+void Game::setSnake(const std::deque<Point>& snake)
+{
+    snake_ = snake;
+}
+
+void Game::syncBiomesFromColumns()
+{
+    for (int y = 0; y < height_; ++y) {
+        for (int x = 0; x < width_; ++x) {
+            biomes_[static_cast<std::size_t>(index({ x, y }))] = biomeForColumn(x);
+        }
+    }
+}
+
+void Game::restoreState(
+    int score,
+    int minedBlocks,
+    int builtBlocks,
+    int ticks,
+    Inventory inventory,
+    Direction direction,
+    Direction pendingDirection,
+    Tile selectedBlock)
+{
+    score_ = score;
+    minedBlocks_ = minedBlocks;
+    builtBlocks_ = builtBlocks;
+    ticks_ = ticks;
+    inventory_ = inventory;
+    direction_ = direction;
+    pendingDirection_ = pendingDirection;
+    selectedBlock_ = selectedBlock;
+    paused_ = false;
+    gameOver_ = false;
+    quitRequested_ = false;
+    message_.clear();
 }
 
 bool Game::inside(Point point) const
@@ -523,24 +621,69 @@ int Game::index(Point point) const
     return point.y * width_ + point.x;
 }
 
+Biome Game::biomeForColumn(int x) const
+{
+    const int forestEnd = width_ / 3;
+    const int caveEnd = (width_ * 2) / 3;
+
+    if (x < forestEnd) {
+        return Biome::Forest;
+    }
+
+    if (x < caveEnd) {
+        return Biome::Cave;
+    }
+
+    return Biome::Desert;
+}
+
+Tile Game::rollTerrainTile(Biome biome, int roll) const
+{
+    switch (biome) {
+    case Biome::Forest:
+        if (roll < 8) {
+            return Tile::Wood;
+        }
+        if (roll < 12) {
+            return Tile::Dirt;
+        }
+        break;
+    case Biome::Cave:
+        if (roll < 9) {
+            return Tile::Stone;
+        }
+        if (roll < 11) {
+            return Tile::Ore;
+        }
+        if (roll < 13) {
+            return Tile::Dirt;
+        }
+        break;
+    case Biome::Desert:
+        if (roll < 10) {
+            return Tile::Sand;
+        }
+        if (roll < 13) {
+            return Tile::Dirt;
+        }
+        break;
+    }
+
+    return Tile::Empty;
+}
+
 void Game::generateWorld()
 {
     std::uniform_int_distribution<int> hundred(0, 99);
 
     for (int y = 0; y < height_; ++y) {
         for (int x = 0; x < width_; ++x) {
+            const Biome biome = biomeForColumn(x);
             const int roll = hundred(rng_);
-            Tile tile = Tile::Empty;
+            const Point point { x, y };
 
-            if (roll < 7) {
-                tile = Tile::Dirt;
-            } else if (roll < 10) {
-                tile = Tile::Stone;
-            } else if (roll < 12) {
-                tile = Tile::Wood;
-            }
-
-            world_[static_cast<std::size_t>(index({ x, y }))] = tile;
+            biomes_[static_cast<std::size_t>(index(point))] = biome;
+            world_[static_cast<std::size_t>(index(point))] = rollTerrainTile(biome, roll);
         }
     }
 
@@ -551,12 +694,22 @@ void Game::generateWorld()
     const int veins = std::max(4, (width_ * height_) / 120);
     for (int vein = 0; vein < veins; ++vein) {
         Point cursor { xdist(rng_), ydist(rng_) };
-        const Tile tile = (vein % 3 == 0) ? Tile::Stone : Tile::Dirt;
+        const Biome biome = biomeForColumn(cursor.x);
+        Tile tile = Tile::Dirt;
+        if (biome == Biome::Cave) {
+            tile = (vein % 2 == 0) ? Tile::Ore : Tile::Stone;
+        } else if (biome == Biome::Forest) {
+            tile = Tile::Wood;
+        } else {
+            tile = Tile::Sand;
+        }
+
         const int length = lengthDist(rng_);
 
         for (int step = 0; step < length; ++step) {
             if (inside(cursor)) {
                 world_[static_cast<std::size_t>(index(cursor))] = tile;
+                biomes_[static_cast<std::size_t>(index(cursor))] = biomeForColumn(cursor.x);
             }
 
             const int turn = hundred(rng_) % 4;
@@ -622,6 +775,10 @@ void Game::cycleSelectedBlock()
         selectedBlock_ = Tile::Wood;
         break;
     case Tile::Wood:
+        selectedBlock_ = Tile::Sand;
+        break;
+    case Tile::Sand:
+    case Tile::Ore:
     case Tile::Empty:
         selectedBlock_ = Tile::Dirt;
         break;
@@ -646,6 +803,10 @@ char Game::tileGlyph(Tile tile) const
         return '%';
     case Tile::Wood:
         return '|';
+    case Tile::Sand:
+        return ':';
+    case Tile::Ore:
+        return '*';
     }
 
     return '?';
@@ -662,6 +823,24 @@ std::string Game::tileName(Tile tile) const
         return "stone";
     case Tile::Wood:
         return "wood";
+    case Tile::Sand:
+        return "sand";
+    case Tile::Ore:
+        return "ore";
+    }
+
+    return "unknown";
+}
+
+std::string Game::biomeName(Biome biome) const
+{
+    switch (biome) {
+    case Biome::Forest:
+        return "forest";
+    case Biome::Cave:
+        return "cave";
+    case Biome::Desert:
+        return "desert";
     }
 
     return "unknown";

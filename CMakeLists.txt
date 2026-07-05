@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(SnakecraftCpp
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "A Snake game with simple world-building mechanics"
     LANGUAGES CXX
 )
@@ -12,6 +12,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(snakecraft_core
     src/Game.cpp
+    src/ScoreStore.cpp
+    src/SaveManager.cpp
 )
 
 target_include_directories(snakecraft_core

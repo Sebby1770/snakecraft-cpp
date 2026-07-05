@@ -20,7 +20,15 @@ enum class Tile {
     Empty,
     Dirt,
     Stone,
-    Wood
+    Wood,
+    Sand,
+    Ore
+};
+
+enum class Biome {
+    Forest,
+    Cave,
+    Desert
 };
 
 enum class Direction {
@@ -41,6 +49,8 @@ enum class Action {
     CycleBlock,
     Pause,
     Restart,
+    SaveGame,
+    LoadGame,
     Quit
 };
 
@@ -48,6 +58,8 @@ struct Inventory {
     int dirt = 0;
     int stone = 0;
     int wood = 0;
+    int sand = 0;
+    int ore = 0;
 
     [[nodiscard]] int count(Tile tile) const;
     void add(Tile tile);
@@ -76,12 +88,15 @@ public:
     [[nodiscard]] Point food() const;
     [[nodiscard]] Point pointAhead() const;
     [[nodiscard]] Direction direction() const;
+    [[nodiscard]] Direction pendingDirection() const;
     [[nodiscard]] Tile selectedBlock() const;
     [[nodiscard]] const Inventory& inventory() const;
     [[nodiscard]] const std::deque<Point>& snake() const;
     [[nodiscard]] const std::string& message() const;
     [[nodiscard]] int ticks() const;
+    [[nodiscard]] unsigned int seed() const;
     [[nodiscard]] Tile tileAt(Point point) const;
+    [[nodiscard]] Biome biomeAt(Point point) const;
     [[nodiscard]] bool containsSnake(Point point) const;
 
     bool mineAhead();
@@ -89,6 +104,17 @@ public:
 
     void setTile(Point point, Tile tile);
     void setFood(Point point);
+    void setSnake(const std::deque<Point>& snake);
+    void syncBiomesFromColumns();
+    void restoreState(
+        int score,
+        int minedBlocks,
+        int builtBlocks,
+        int ticks,
+        Inventory inventory,
+        Direction direction,
+        Direction pendingDirection,
+        Tile selectedBlock);
 
 private:
     [[nodiscard]] bool inside(Point point) const;
@@ -102,14 +128,18 @@ private:
     void spawnFood();
     void cycleSelectedBlock();
     void setMessage(std::string message);
+    [[nodiscard]] Biome biomeForColumn(int x) const;
+    [[nodiscard]] Tile rollTerrainTile(Biome biome, int roll) const;
 
     [[nodiscard]] char tileGlyph(Tile tile) const;
     [[nodiscard]] std::string tileName(Tile tile) const;
+    [[nodiscard]] std::string biomeName(Biome biome) const;
     [[nodiscard]] std::string directionName() const;
 
     int width_;
     int height_;
     std::vector<Tile> world_;
+    std::vector<Biome> biomes_;
     std::deque<Point> snake_;
     Direction direction_ = Direction::Right;
     Direction pendingDirection_ = Direction::Right;

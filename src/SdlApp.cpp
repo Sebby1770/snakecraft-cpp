@@ -1,4 +1,6 @@
 #include "Game.hpp"
+#include "SaveManager.hpp"
+#include "ScoreStore.hpp"
 
 #include <SDL.h>
 #include <SDL_ttf.h>
@@ -20,9 +22,12 @@
 namespace {
 
 using snakecraft::Action;
+using snakecraft::Biome;
 using snakecraft::Direction;
 using snakecraft::Game;
 using snakecraft::Point;
+using snakecraft::ScoreStore;
+using snakecraft::SaveManager;
 using snakecraft::Tile;
 
 constexpr int kCellSize = 24;
@@ -250,11 +255,29 @@ std::string tileName(Tile tile)
         return "Stone";
     case Tile::Wood:
         return "Wood";
+    case Tile::Sand:
+        return "Sand";
+    case Tile::Ore:
+        return "Ore";
     case Tile::Empty:
         return "Empty";
     }
 
     return "Unknown";
+}
+
+Color biomeTint(Biome biome)
+{
+    switch (biome) {
+    case Biome::Forest:
+        return { 28, 48, 40, 255 };
+    case Biome::Cave:
+        return { 24, 30, 38, 255 };
+    case Biome::Desert:
+        return { 52, 42, 30, 255 };
+    }
+
+    return { 32, 50, 43, 255 };
 }
 
 Color tileColor(Tile tile)
@@ -266,6 +289,10 @@ Color tileColor(Tile tile)
         return { 144, 153, 159, 255 };
     case Tile::Wood:
         return { 190, 131, 76, 255 };
+    case Tile::Sand:
+        return { 214, 181, 112, 255 };
+    case Tile::Ore:
+        return { 96, 176, 214, 255 };
     case Tile::Empty:
         return { 32, 50, 43, 255 };
     }
@@ -317,6 +344,10 @@ Action actionFromKey(SDL_Keycode key)
         return Action::Pause;
     case SDLK_r:
         return Action::Restart;
+    case SDLK_F5:
+        return Action::SaveGame;
+    case SDLK_F9:
+        return Action::LoadGame;
     case SDLK_q:
     case SDLK_ESCAPE:
         return Action::Quit;
@@ -331,12 +362,12 @@ std::chrono::milliseconds frameDelayForScore(int score)
     return std::chrono::milliseconds(145 - speedup);
 }
 
-void drawTile(SDL_Renderer* renderer, Point point, Tile tile)
+void drawTile(SDL_Renderer* renderer, Point point, Tile tile, Biome biome)
 {
     const SDL_Rect rect = cellRect(point, 1);
 
     if (tile == Tile::Empty) {
-        fillRect(renderer, rect, tileColor(tile));
+        fillRect(renderer, rect, biomeTint(biome));
         return;
     }
 
@@ -361,6 +392,19 @@ void drawTile(SDL_Renderer* renderer, Point point, Tile tile)
         fillRoundedRect(renderer, { rect.x + rect.w - 8, rect.y + 3, 4, rect.h - 6 }, 2, { 229, 167, 97, 130 });
         drawCircle(renderer, rect.x + (rect.w / 2), rect.y + (rect.h / 2), 5, { 129, 81, 45, 150 });
     }
+
+    if (tile == Tile::Sand) {
+        for (int i = 0; i < 5; ++i) {
+            const int px = rect.x + 3 + (hashCell(point.x, point.y, i + 4) % std::max(1, rect.w - 6));
+            const int py = rect.y + 3 + (hashCell(point.y, point.x, i + 5) % std::max(1, rect.h - 6));
+            fillCircle(renderer, px, py, 1, { 255, 236, 180, 170 });
+        }
+    }
+
+    if (tile == Tile::Ore) {
+        drawCircle(renderer, rect.x + (rect.w / 2), rect.y + (rect.h / 2), 6, { 58, 132, 168, 220 });
+        fillCircle(renderer, rect.x + (rect.w / 2) - 2, rect.y + (rect.h / 2) - 2, 2, { 210, 244, 255, 220 });
+    }
 }
 
 void drawBoard(SDL_Renderer* renderer, const Game& game)
@@ -377,7 +421,7 @@ void drawBoard(SDL_Renderer* renderer, const Game& game)
 
     for (int y = 0; y < game.height(); ++y) {
         for (int x = 0; x < game.width(); ++x) {
-            drawTile(renderer, { x, y }, game.tileAt({ x, y }));
+            drawTile(renderer, { x, y }, game.tileAt({ x, y }), game.biomeAt({ x, y }));
         }
     }
 
@@ -468,7 +512,7 @@ void drawSnake(SDL_Renderer* renderer, const Game& game)
     drawSnakeHead(renderer, game.snakeHead(), game.direction());
 }
 
-void drawHud(SDL_Renderer* renderer, const Game& game, const FontSet& fonts)
+void drawHud(SDL_Renderer* renderer, const Game& game, const FontSet& fonts, const ScoreStore& scores)
 {
     fillRect(renderer, { 0, 0, kWindowWidth, kWindowHeight }, { 18, 29, 27, 255 });
     fillRoundedRect(renderer, { 24, 22, kWindowWidth - 48, 74 }, 12, { 238, 234, 217, 255 });
@@ -480,16 +524,19 @@ void drawHud(SDL_Renderer* renderer, const Game& game, const FontSet& fonts)
           << "   Mined " << game.minedBlocks()
           << "   Built " << game.builtBlocks();
     drawText(renderer, fonts.body, stats.str(), 252, 44, { 47, 62, 56, 255 });
+    drawText(renderer, fonts.small, "Best " + std::to_string(scores.bestScore()), 252, 68, { 79, 92, 84, 255 });
 
     const int panelX = kBoardX + (game.width() * kCellSize) + kPanelGap;
     fillRoundedRect(renderer, { panelX, kBoardY - 6, kPanelWidth, (game.height() * kCellSize) + 12 }, 12, { 238, 234, 217, 255 });
 
     drawText(renderer, fonts.body, "Inventory", panelX + 22, kBoardY + 18, { 31, 45, 39, 255 });
 
-    const std::array<std::pair<Tile, int>, 3> rows {
+    const std::array<std::pair<Tile, int>, 5> rows {
         std::pair { Tile::Dirt, game.inventory().dirt },
         std::pair { Tile::Stone, game.inventory().stone },
         std::pair { Tile::Wood, game.inventory().wood },
+        std::pair { Tile::Sand, game.inventory().sand },
+        std::pair { Tile::Ore, game.inventory().ore },
     };
 
     int y = kBoardY + 58;
@@ -511,6 +558,8 @@ void drawHud(SDL_Renderer* renderer, const Game& game, const FontSet& fonts)
     drawText(renderer, fonts.small, "Mine  Space", panelX + 22, y + 62, { 67, 78, 72, 255 });
     drawText(renderer, fonts.small, "Build  E", panelX + 22, y + 88, { 67, 78, 72, 255 });
     drawText(renderer, fonts.small, "Block  Tab", panelX + 22, y + 114, { 67, 78, 72, 255 });
+    drawText(renderer, fonts.small, "Save  F5", panelX + 22, y + 140, { 67, 78, 72, 255 });
+    drawText(renderer, fonts.small, "Load  F9", panelX + 22, y + 166, { 67, 78, 72, 255 });
 
     const std::string message = game.message().empty() ? "Ready." : game.message();
     drawText(renderer, fonts.small, message, kBoardX, kWindowHeight - 42, { 218, 228, 211, 255 });
@@ -528,7 +577,7 @@ void drawAimHint(SDL_Renderer* renderer, const Game& game)
     drawRect(renderer, { rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2 }, { 255, 236, 150, 90 });
 }
 
-void drawOverlay(SDL_Renderer* renderer, const Game& game, const FontSet& fonts)
+void drawOverlay(SDL_Renderer* renderer, const Game& game, const FontSet& fonts, const ScoreStore& scores)
 {
     if (!game.isPaused() && !game.isGameOver()) {
         return;
@@ -537,28 +586,38 @@ void drawOverlay(SDL_Renderer* renderer, const Game& game, const FontSet& fonts)
     fillRect(renderer, { 0, 0, kWindowWidth, kWindowHeight }, { 7, 13, 12, 150 });
 
     const SDL_Rect modal {
-        (kWindowWidth - 460) / 2,
-        (kWindowHeight - 180) / 2,
-        460,
-        180,
+        (kWindowWidth - 500) / 2,
+        (kWindowHeight - 220) / 2,
+        500,
+        220,
     };
 
     fillRoundedRect(renderer, modal, 14, { 238, 234, 217, 255 });
     drawTextCentered(renderer, fonts.title, game.isGameOver() ? "Run Ended" : "Paused", { modal.x, modal.y + 22, modal.w, 40 }, { 31, 45, 39, 255 });
     drawTextCentered(renderer, fonts.body, game.message(), { modal.x + 28, modal.y + 78, modal.w - 56, 30 }, { 64, 75, 68, 255 });
-    drawTextCentered(renderer, fonts.small, "R restart    P resume    Q quit", { modal.x, modal.y + 128, modal.w, 26 }, { 79, 88, 83, 255 });
+
+    if (game.isGameOver() && !scores.entries().empty()) {
+        std::ostringstream leaderboard;
+        leaderboard << "Top score " << scores.entries().front().score;
+        if (scores.entries().size() > 1) {
+            leaderboard << "  |  #2 " << scores.entries()[1].score;
+        }
+        drawTextCentered(renderer, fonts.small, leaderboard.str(), { modal.x, modal.y + 118, modal.w, 24 }, { 79, 88, 83, 255 });
+    }
+
+    drawTextCentered(renderer, fonts.small, "R restart    P resume    Q quit", { modal.x, modal.y + 158, modal.w, 26 }, { 79, 88, 83, 255 });
 }
 
-void renderFrame(SDL_Renderer* renderer, const Game& game, const FontSet& fonts, double seconds)
+void renderFrame(SDL_Renderer* renderer, const Game& game, const FontSet& fonts, const ScoreStore& scores, double seconds)
 {
     setColor(renderer, { 18, 29, 27, 255 });
     SDL_RenderClear(renderer);
-    drawHud(renderer, game, fonts);
+    drawHud(renderer, game, fonts, scores);
     drawBoard(renderer, game);
     drawAimHint(renderer, game);
     drawFood(renderer, game.food(), seconds);
     drawSnake(renderer, game);
-    drawOverlay(renderer, game, fonts);
+    drawOverlay(renderer, game, fonts, scores);
 }
 
 void saveScreenshot(SDL_Renderer* renderer, const std::filesystem::path& path)
@@ -632,13 +691,25 @@ int main(int argc, char** argv)
 
         SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_BLEND);
 
+        const auto dataDir = [&]() {
+            const auto home = std::getenv("HOME");
+            if (home != nullptr) {
+                return std::filesystem::path(home) / ".snakecraft";
+            }
+            return std::filesystem::current_path() / ".snakecraft";
+        }();
+        std::filesystem::create_directories(dataDir);
+
+        ScoreStore scores((dataDir / "highscores.txt").string());
+        SaveManager saves(dataDir / "savegame.txt");
+
         Game game(42, 22, options.screenshot ? 1770 : static_cast<unsigned int>(std::chrono::steady_clock::now().time_since_epoch().count()));
 
         if (options.screenshot) {
             for (int i = 0; i < 3; ++i) {
                 game.tick();
             }
-            renderFrame(renderer.get(), game, fonts, 1.0);
+            renderFrame(renderer.get(), game, fonts, scores, 1.0);
             SDL_RenderPresent(renderer.get());
             saveScreenshot(renderer.get(), options.screenshotPath);
             closeFonts(fonts);
@@ -656,18 +727,41 @@ int main(int argc, char** argv)
                 }
 
                 if (event.type == SDL_KEYDOWN && event.key.repeat == 0) {
-                    game.handle(actionFromKey(event.key.keysym.sym));
+                    const Action action = actionFromKey(event.key.keysym.sym);
+                    if (action == Action::SaveGame) {
+                        if (saves.save(game)) {
+                            game.handle(Action::None);
+                        }
+                        continue;
+                    }
+
+                    if (action == Action::LoadGame) {
+                        if (auto loaded = saves.load()) {
+                            game = std::move(*loaded);
+                        }
+                        continue;
+                    }
+
+                    game.handle(action);
                 }
             }
 
             const auto now = std::chrono::steady_clock::now();
             if (now - lastTick >= frameDelayForScore(game.score())) {
+                const bool wasOver = game.isGameOver();
                 game.tick();
+                if (!wasOver && game.isGameOver()) {
+                    scores.tryAdd(
+                        game.score(),
+                        static_cast<int>(game.snakeLength()),
+                        game.minedBlocks(),
+                        game.builtBlocks());
+                }
                 lastTick = now;
             }
 
             const double seconds = SDL_GetTicks64() / 1000.0;
-            renderFrame(renderer.get(), game, fonts, seconds);
+            renderFrame(renderer.get(), game, fonts, scores, seconds);
             SDL_RenderPresent(renderer.get());
             SDL_Delay(8);
         }
