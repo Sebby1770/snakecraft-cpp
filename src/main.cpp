@@ -8,6 +8,8 @@
 #include <cctype>
 #include <filesystem>
 #include <iostream>
+#include <random>
+#include <string>
 #include <thread>
 
 namespace {
@@ -33,6 +35,10 @@ snakecraft::Action actionFromKey(char key)
         return snakecraft::Action::CycleBlock;
     case 'p':
         return snakecraft::Action::Pause;
+    case 't':
+        return snakecraft::Action::ToggleWrap;
+    case 'u':
+        return snakecraft::Action::Undo;
     case 'r':
         return snakecraft::Action::Restart;
     case '5':
@@ -79,15 +85,22 @@ void recordHighScore(snakecraft::ScoreStore& scores, const snakecraft::Game& gam
 
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
     using Clock = std::chrono::steady_clock;
+
+    unsigned int seed = std::random_device{}();
+    for (int i = 1; i + 1 < argc; ++i) {
+        if (std::string(argv[i]) == "--seed") {
+            seed = static_cast<unsigned int>(std::stoul(argv[i + 1]));
+        }
+    }
 
     const auto dataDir = dataDirectory();
     std::filesystem::create_directories(dataDir);
 
     snakecraft::Terminal terminal;
-    snakecraft::Game game;
+    snakecraft::Game game(42, 22, seed);
     snakecraft::ScoreStore scores((dataDir / "highscores.txt").string());
     snakecraft::SaveManager saves(dataDir / "savegame.txt");
 

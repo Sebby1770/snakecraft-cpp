@@ -342,6 +342,10 @@ Action actionFromKey(SDL_Keycode key)
         return Action::CycleBlock;
     case SDLK_p:
         return Action::Pause;
+    case SDLK_t:
+        return Action::ToggleWrap;
+    case SDLK_u:
+        return Action::Undo;
     case SDLK_r:
         return Action::Restart;
     case SDLK_F5:

@@ -38,6 +38,12 @@ enum class Direction {
     Right
 };
 
+enum class FoodKind {
+    Regular,
+    Golden,
+    Poison
+};
+
 enum class Action {
     None,
     MoveUp,
@@ -51,6 +57,8 @@ enum class Action {
     Restart,
     SaveGame,
     LoadGame,
+    ToggleWrap,
+    Undo,
     Quit
 };
 
@@ -86,6 +94,13 @@ public:
     [[nodiscard]] std::size_t snakeLength() const;
     [[nodiscard]] Point snakeHead() const;
     [[nodiscard]] Point food() const;
+    [[nodiscard]] FoodKind foodKind() const;
+    [[nodiscard]] bool wrapWorld() const;
+    [[nodiscard]] int combo() const;
+    [[nodiscard]] int bestCombo() const;
+    [[nodiscard]] int foodsEaten() const;
+    [[nodiscard]] int lives() const;
+    [[nodiscard]] bool canUndo() const;
     [[nodiscard]] Point pointAhead() const;
     [[nodiscard]] Direction direction() const;
     [[nodiscard]] Direction pendingDirection() const;
@@ -104,6 +119,9 @@ public:
 
     void setTile(Point point, Tile tile);
     void setFood(Point point);
+    void setFoodKind(FoodKind kind);
+    void setWrapWorld(bool enabled);
+    bool undo();
     void setSnake(const std::deque<Point>& snake);
     void syncBiomesFromColumns();
     void restoreState(
@@ -126,7 +144,11 @@ private:
     void generateWorld();
     void carveSafeArea(Point center);
     void spawnFood();
+    void respawnAfterHit();
+    bool loseLife(const std::string& reason);
     void cycleSelectedBlock();
+    void pushUndo();
+    [[nodiscard]] int foodScore() const;
     void setMessage(std::string message);
     [[nodiscard]] Biome biomeForColumn(int x) const;
     [[nodiscard]] Tile rollTerrainTile(Biome biome, int roll) const;
@@ -144,6 +166,33 @@ private:
     Direction direction_ = Direction::Right;
     Direction pendingDirection_ = Direction::Right;
     Point food_;
+    FoodKind foodKind_ = FoodKind::Regular;
+    bool wrapWorld_ = false;
+    int combo_ = 0;
+    int bestCombo_ = 0;
+    int foodsEaten_ = 0;
+    int lives_ = 3;
+    struct UndoFrame {
+        std::vector<Tile> world;
+        std::deque<Point> snake;
+        Point food;
+        FoodKind foodKind = FoodKind::Regular;
+        Direction direction = Direction::Right;
+        Direction pendingDirection = Direction::Right;
+        Inventory inventory;
+        Tile selectedBlock = Tile::Dirt;
+        int score = 0;
+        int minedBlocks = 0;
+        int builtBlocks = 0;
+        int ticks = 0;
+        int combo = 0;
+        int bestCombo = 0;
+        int foodsEaten = 0;
+        int lives = 3;
+        bool wrapWorld = false;
+        bool gameOver = false;
+    };
+    std::vector<UndoFrame> undoStack_;
     std::mt19937 rng_;
     unsigned int seed_;
     Inventory inventory_;
