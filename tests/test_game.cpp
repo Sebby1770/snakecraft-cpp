@@ -66,7 +66,8 @@ int main()
         require(game.builtBlocks() == 1, "built block counter should increment");
 
         game.tick();
-        require(game.isGameOver(), "moving into built terrain should end the run");
+        require(game.lives() == 2, "first collision should spend a life");
+        require(!game.isGameOver(), "the run continues until lives are gone");
     }
 
     {
@@ -199,6 +200,29 @@ int main()
         require(game.snakeHead() != before, "head should advance");
         require(game.undo(), "undo should rewind the step");
         require(game.snakeHead() == before, "undo should restore the previous head");
+    }
+
+    {
+        snakecraft::Game game(30, 16, 21);
+        clearsPath(game, 4);
+        const auto length = game.snakeLength();
+        const auto front = inFrontOf(game);
+        game.setFood(front);
+        game.setFoodKind(snakecraft::FoodKind::Poison);
+        require(game.tick(), "poison tick should not end the run");
+        require(game.combo() == 0, "poison should break combo");
+        require(game.snakeLength() <= length, "poison should not grow the snake");
+    }
+
+    {
+        snakecraft::Game game(30, 16, 23);
+        require(game.lives() == 3, "new games start with three lives");
+        game.setWrapWorld(false);
+        game.setSnake({ { 0, 8 }, { 1, 8 }, { 2, 8 } });
+        game.handle(snakecraft::Action::MoveLeft);
+        game.tick();
+        require(game.lives() == 2, "edge hit spends a life");
+        require(!game.isGameOver(), "two lives remain");
     }
 
     std::cout << "all core mechanics passed\n";

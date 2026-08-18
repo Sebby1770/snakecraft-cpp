@@ -40,7 +40,8 @@ enum class Direction {
 
 enum class FoodKind {
     Regular,
-    Golden
+    Golden,
+    Poison
 };
 
 enum class Action {
@@ -98,6 +99,7 @@ public:
     [[nodiscard]] int combo() const;
     [[nodiscard]] int bestCombo() const;
     [[nodiscard]] int foodsEaten() const;
+    [[nodiscard]] int lives() const;
     [[nodiscard]] bool canUndo() const;
     [[nodiscard]] Point pointAhead() const;
     [[nodiscard]] Direction direction() const;
@@ -142,6 +144,8 @@ private:
     void generateWorld();
     void carveSafeArea(Point center);
     void spawnFood();
+    void respawnAfterHit();
+    bool loseLife(const std::string& reason);
     void cycleSelectedBlock();
     void pushUndo();
     [[nodiscard]] int foodScore() const;
@@ -167,6 +171,7 @@ private:
     int combo_ = 0;
     int bestCombo_ = 0;
     int foodsEaten_ = 0;
+    int lives_ = 3;
     struct UndoFrame {
         std::vector<Tile> world;
         std::deque<Point> snake;
@@ -183,6 +188,7 @@ private:
         int combo = 0;
         int bestCombo = 0;
         int foodsEaten = 0;
+        int lives = 3;
         bool wrapWorld = false;
         bool gameOver = false;
     };

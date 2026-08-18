@@ -2,6 +2,13 @@
 
 All notable changes to Snakecraft C++ are documented in this file.
 
+## [0.4.0] - 2026-08-18
+
+### Added
+- Three lives: a wall or self-hit respawns the snake instead of ending the run immediately.
+- Poison food (`x`) shrinks the snake and breaks combo.
+- Terminal `--seed N` for reproducible worlds.
+
 ## [0.3.0] - 2026-08-18
 
 ### Added

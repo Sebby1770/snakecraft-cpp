@@ -154,6 +154,7 @@ void Game::reset()
     combo_ = 0;
     bestCombo_ = 0;
     foodsEaten_ = 0;
+    lives_ = 3;
     undoStack_.clear();
     message_.clear();
 
@@ -257,36 +258,39 @@ bool Game::tick()
     const bool eating = next == food_;
 
     if (!inside(next)) {
-        gameOver_ = true;
-        setMessage("You hit the edge of the world. Press R to restart.");
-        return false;
+        return loseLife("You hit the edge of the world.");
     }
 
     if (isBlocked(next)) {
-        gameOver_ = true;
-        setMessage("Terrain collision. Mine before you move next time.");
-        return false;
+        return loseLife("Terrain collision. Mine before you move next time.");
     }
 
     const auto bodyEnd = eating ? snake_.end() : std::prev(snake_.end());
     if (std::find(snake_.begin(), bodyEnd, next) != bodyEnd) {
-        gameOver_ = true;
-        setMessage("You crossed your own trail. Press R to restart.");
-        return false;
+        return loseLife("You crossed your own trail.");
     }
 
     snake_.push_front(next);
 
     if (eating) {
-        ++combo_;
         ++foodsEaten_;
-        bestCombo_ = std::max(bestCombo_, combo_);
-        const int gained = foodScore() + std::max(0, combo_ - 1) * 2;
-        score_ += gained;
-        if (foodKind_ == FoodKind::Golden) {
-            setMessage("Golden bite! Combo x" + std::to_string(combo_) + ".");
+        if (foodKind_ == FoodKind::Poison) {
+            combo_ = 0;
+            snake_.pop_back();
+            if (snake_.size() > 3) {
+                snake_.pop_back();
+            }
+            score_ = std::max(0, score_ - 5);
+            setMessage("Poison apple. The snake shrank.");
         } else {
-            setMessage("Food collected. Combo x" + std::to_string(combo_) + ".");
+            ++combo_;
+            bestCombo_ = std::max(bestCombo_, combo_);
+            score_ += foodScore() + std::max(0, combo_ - 1) * 2;
+            if (foodKind_ == FoodKind::Golden) {
+                setMessage("Golden bite! Combo x" + std::to_string(combo_) + ".");
+            } else {
+                setMessage("Food collected. Combo x" + std::to_string(combo_) + ".");
+            }
         }
         spawnFood();
     } else {
@@ -305,6 +309,7 @@ std::string Game::render() const
         << "  Length " << std::setw(2) << snake_.size()
         << "  Facing " << directionName()
         << "  Combo x" << combo_
+        << "  Lives " << lives_
         << "  Mined " << minedBlocks_
         << "  Built " << builtBlocks_
         << (wrapWorld_ ? "  WRAP" : "") << '\n';
@@ -339,7 +344,8 @@ std::string Game::render() const
             }
 
             if (point == food_) {
-                out << (foodKind_ == FoodKind::Golden ? '$' : '@');
+                out << (foodKind_ == FoodKind::Golden ? '$'
+                        : foodKind_ == FoodKind::Poison ? 'x' : '@');
                 continue;
             }
 
@@ -446,6 +452,11 @@ int Game::bestCombo() const
 int Game::foodsEaten() const
 {
     return foodsEaten_;
+}
+
+int Game::lives() const
+{
+    return lives_;
 }
 
 bool Game::canUndo() const
@@ -642,6 +653,7 @@ bool Game::undo()
     combo_ = frame.combo;
     bestCombo_ = frame.bestCombo;
     foodsEaten_ = frame.foodsEaten;
+    lives_ = frame.lives;
     wrapWorld_ = frame.wrapWorld;
     gameOver_ = frame.gameOver;
     paused_ = false;
@@ -668,6 +680,7 @@ void Game::pushUndo()
     frame.combo = combo_;
     frame.bestCombo = bestCombo_;
     frame.foodsEaten = foodsEaten_;
+    frame.lives = lives_;
     frame.wrapWorld = wrapWorld_;
     frame.gameOver = gameOver_;
     undoStack_.push_back(std::move(frame));
@@ -678,7 +691,44 @@ void Game::pushUndo()
 
 int Game::foodScore() const
 {
-    return foodKind_ == FoodKind::Golden ? 25 : 10;
+    if (foodKind_ == FoodKind::Golden) {
+        return 25;
+    }
+    if (foodKind_ == FoodKind::Poison) {
+        return 0;
+    }
+    return 10;
+}
+
+bool Game::loseLife(const std::string& reason)
+{
+    if (lives_ > 1) {
+        --lives_;
+        combo_ = 0;
+        respawnAfterHit();
+        setMessage(reason + " Lives left: " + std::to_string(lives_) + ".");
+        return false;
+    }
+
+    lives_ = 0;
+    gameOver_ = true;
+    setMessage(reason + " Press R to restart.");
+    return false;
+}
+
+void Game::respawnAfterHit()
+{
+    const Point start { width_ / 2, height_ / 2 };
+    snake_.clear();
+    snake_.push_back(start);
+    snake_.push_back({ start.x - 1, start.y });
+    snake_.push_back({ start.x - 2, start.y });
+    direction_ = Direction::Right;
+    pendingDirection_ = Direction::Right;
+    carveSafeArea(start);
+    if (food_ == start || containsSnake(food_)) {
+        spawnFood();
+    }
 }
 
 void Game::setSnake(const std::deque<Point>& snake)
@@ -910,7 +960,13 @@ void Game::spawnFood()
 
     std::uniform_int_distribution<std::size_t> pick(0, candidates.size() - 1);
     food_ = candidates[pick(rng_)];
-    foodKind_ = ((foodsEaten_ + 1) % 5 == 0) ? FoodKind::Golden : FoodKind::Regular;
+    if ((foodsEaten_ + 1) % 7 == 0) {
+        foodKind_ = FoodKind::Poison;
+    } else if ((foodsEaten_ + 1) % 5 == 0) {
+        foodKind_ = FoodKind::Golden;
+    } else {
+        foodKind_ = FoodKind::Regular;
+    }
 }
 
 void Game::cycleSelectedBlock()
