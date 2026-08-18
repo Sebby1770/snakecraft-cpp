@@ -158,6 +158,49 @@ int main()
         std::filesystem::remove_all(tempDir);
     }
 
+    {
+        snakecraft::Game game(30, 16, 3);
+        game.setWrapWorld(true);
+        game.setSnake({ { 29, 8 }, { 28, 8 }, { 27, 8 } });
+        game.handle(snakecraft::Action::MoveRight);
+        for (int x = 0; x < 30; ++x) {
+            game.setTile({ x, 8 }, snakecraft::Tile::Empty);
+        }
+        game.setFood({ 1, 1 });
+        require(game.tick(), "wrap move should stay alive");
+        require(game.snakeHead().x == 0, "head should wrap to the left edge");
+        require(!game.isGameOver(), "wrap should not count as an edge death");
+    }
+
+    {
+        snakecraft::Game game(30, 16, 11);
+        clearsPath(game, 6);
+        auto front = inFrontOf(game);
+        game.setFood(front);
+        game.setFoodKind(snakecraft::FoodKind::Regular);
+        require(game.tick(), "first food tick");
+        require(game.combo() == 1, "first bite starts combo");
+        require(game.score() == 10, "first regular food is 10");
+
+        front = inFrontOf(game);
+        game.setTile(front, snakecraft::Tile::Empty);
+        game.setFood(front);
+        game.setFoodKind(snakecraft::FoodKind::Golden);
+        require(game.tick(), "golden food tick");
+        require(game.combo() == 2, "combo should increment");
+        require(game.score() == 37, "golden plus combo bonus should score 25+2");
+    }
+
+    {
+        snakecraft::Game game(30, 16, 19);
+        clearsPath(game, 4);
+        const auto before = game.snakeHead();
+        require(game.tick(), "first step should move");
+        require(game.snakeHead() != before, "head should advance");
+        require(game.undo(), "undo should rewind the step");
+        require(game.snakeHead() == before, "undo should restore the previous head");
+    }
+
     std::cout << "all core mechanics passed\n";
     return 0;
 }

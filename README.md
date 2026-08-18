@@ -15,6 +15,9 @@ Snakecraft C++ starts as a classic Snake game and nudges it toward a tiny "Terra
 - Inventory and selected block display in the HUD.
 - Persistent top-five high score table.
 - Save and load full runs to `~/.snakecraft/savegame.txt`.
+- Wrap-around world mode (`T`) so edges become portals.
+- Combo streak and golden food (`$`) for higher scores.
+- Undo the last beat (`U`) — including a death tick.
 - Pause, restart, and quit controls.
 - Terminal fallback build for simple environments.
 - CTest suite for core mechanics, biomes, save/load, and scoring.
@@ -33,6 +36,8 @@ Snakecraft C++ starts as a classic Snake game and nudges it toward a tiny "Terra
 | `Tab` | Cycle selected block type |
 | `F5` / `5` | Save game (SDL / terminal) |
 | `F9` / `9` | Load game (SDL / terminal) |
+| `T` | Toggle wrap-around edges |
+| `U` | Undo last move / mine / build |
 | `P` | Pause |
 | `R` | Restart |
 | `Q` | Quit |

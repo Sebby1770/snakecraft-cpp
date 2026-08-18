@@ -33,6 +33,10 @@ snakecraft::Action actionFromKey(char key)
         return snakecraft::Action::CycleBlock;
     case 'p':
         return snakecraft::Action::Pause;
+    case 't':
+        return snakecraft::Action::ToggleWrap;
+    case 'u':
+        return snakecraft::Action::Undo;
     case 'r':
         return snakecraft::Action::Restart;
     case '5':

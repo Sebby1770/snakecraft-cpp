@@ -2,6 +2,18 @@
 
 All notable changes to Snakecraft C++ are documented in this file.
 
+## [0.3.0] - 2026-08-18
+
+### Added
+- Wrap mode (`T`) turns world edges into portals instead of instant death.
+- Combo scoring: consecutive food bites add bonus points; HUD shows the streak.
+- Golden food (`$`) every fifth bite, worth 25 points plus combo.
+- Undo (`U`) rewinds the last move, mine, or build (and even a fatal tick).
+- Tests for wrap, combo/golden scoring, and undo.
+
+### Changed
+- Terminal and SDL keymaps include wrap and undo.
+
 ## [0.2.0] - 2026-07-06
 
 ### Added
